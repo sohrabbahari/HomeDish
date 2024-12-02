@@ -3,10 +3,12 @@ import { View, Text, FlatList, StyleSheet, Button } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../../redux/slices/cartSlice';
 import api from '../api';
+import { useNavigation } from '@react-navigation/native';
 
 const HomeScreen = () => {
   const [foodListings, setFoodListings] = useState([]);
-  const dispatch = useDispatch(); // Initialize dispatch
+  const dispatch = useDispatch();
+  const navigation = useNavigation();
 
   useEffect(() => {
     const fetchFoodListings = async () => {
@@ -31,10 +33,12 @@ const HomeScreen = () => {
             <Text>{item.description}</Text>
             <Text>${item.price}</Text>
             <Button title="Add to Cart" onPress={() => dispatch(addItem(item))} />
+            <Button title="View Details" onPress={() => navigation.navigate('FoodDetails', { item })} />
           </View>
         )}
         keyExtractor={(item) => item.id.toString()}
       />
+      <Button title="Go to Cart" onPress={() => navigation.navigate('Cart')} />
     </View>
   );
 };
@@ -47,13 +51,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
   },
   listing: {
-    marginBottom: 20, // Added more margin for better separation between items
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+    marginBottom: 15,
   },
   foodTitle: {
     fontSize: 18,

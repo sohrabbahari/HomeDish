@@ -1,49 +1,49 @@
+// src/screens/RegisterScreen.js
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import api from '../api'; // Import the Axios instance for making API calls
+import { useNavigation } from '@react-navigation/native';
+import api from '../api';
 
-const RegisterScreen = ({ navigation }) => {
-  const [name, setName] = useState('');
+const RegisterScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const navigation = useNavigation();
 
   const handleRegister = async () => {
     try {
-      const response = await api.post('/users/register', { name, email, password });
+      const response = await api.post('/users/register', { email, password });
+
       if (response.status === 201) {
-        Alert.alert('Registration Successful', 'You can now log in!');
+        Alert.alert('Success', 'Registration Successful');
         navigation.navigate('Login');
       }
     } catch (error) {
-      console.error('Error registering user:', error);
-      Alert.alert('Registration Failed', 'Something went wrong. Please try again.');
+      Alert.alert('Error', 'Registration failed. Please try again.');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Register for HomeDish</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Name"
-        value={name}
-        onChangeText={setName}
-      />
+      <Text style={styles.title}>Register</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(text) => setEmail(text)}
+        autoCapitalize="none"
       />
       <TextInput
         style={styles.input}
         placeholder="Password"
         value={password}
-        onChangeText={setPassword}
+        onChangeText={(text) => setPassword(text)}
         secureTextEntry
       />
       <Button title="Register" onPress={handleRegister} />
-      <Button title="Back to Login" onPress={() => navigation.navigate('Login')} />
+      <Button
+        title="Already have an account? Login"
+        onPress={() => navigation.navigate('Login')}
+      />
     </View>
   );
 };
@@ -51,19 +51,20 @@ const RegisterScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     padding: 20,
+    justifyContent: 'center',
   },
   title: {
     fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 20,
   },
   input: {
-    height: 40,
-    borderColor: '#ccc',
     borderWidth: 1,
-    marginBottom: 20,
-    paddingHorizontal: 10,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
   },
 });
 

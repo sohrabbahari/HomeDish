@@ -1,66 +1,81 @@
+// src/screens/LoginScreen.js
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import api from '../api'; // Import the Axios instance
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDispatch } from 'react-redux';
+import { setUser } from '../../redux/slices/userSlice';
+import api from '../api';
+import { useNavigation } from '@react-navigation/native';
 
-const LoginScreen = ({ navigation }) => {
-const [email, setEmail] = useState('');
-const [password, setPassword] = useState('');
+const LoginScreen = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const navigation = useNavigation();
+  const dispatch = useDispatch();
 
-const handleLogin = async () => {
+  const handleLogin = async () => {
     try {
-    const response = await api.post('/users/login', { email, password });
-    if (response.status === 200) {
-        Alert.alert('Login Successful', 'Welcome to HomeDish!');
-        await AsyncStorage.setItem('userToken', response.data.token);
-        navigation.navigate('Home');
-        }
-    } 
-    catch (error) {
-        console.error('Error logging in:', error);
-        Alert.alert('Login Failed', 'Invalid credentials. Please try again.');
-    }
-};
+      const response = await api.post('/users/login', { email, password });
 
-return (
+      if (response.data.token) {
+        // Store token in AsyncStorage
+        await AsyncStorage.setItem('token', response.data.token);
+        
+        // Dispatch user info and token to Redux store
+        dispatch(setUser({ email: response.data.email, token: response.data.token }));
+        
+        Alert.alert('Success', 'Login Successful');
+        navigation.navigate('Home');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Invalid credentials. Please try again.');
+    }
+  };
+
+  return (
     <View style={styles.container}>
-    <Text style={styles.title}>Login to HomeDish</Text>
-    <TextInput
+      <Text style={styles.title}>Login</Text>
+      <TextInput
         style={styles.input}
         placeholder="Email"
         value={email}
-        onChangeText={setEmail}
-    />
-    <TextInput
+        onChangeText={(text) => setEmail(text)}
+        autoCapitalize="none"
+      />
+      <TextInput
         style={styles.input}
         placeholder="Password"
         value={password}
-        onChangeText={setPassword}
+        onChangeText={(text) => setPassword(text)}
         secureTextEntry
-    />
-    <Button title="Login" onPress={handleLogin} />
-    <Button title="Register" onPress={() => navigation.navigate('Register')} />
+      />
+      <Button title="Login" onPress={handleLogin} />
+      <Button
+        title="Don't have an account? Register"
+        onPress={() => navigation.navigate('Register')}
+      />
     </View>
-);
+  );
 };
 
 const styles = StyleSheet.create({
-container: {
+  container: {
     flex: 1,
-    justifyContent: 'center',
     padding: 20,
-},
-title: {
+    justifyContent: 'center',
+  },
+  title: {
     fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 20,
-},
-input: {
-    height: 40,
-    borderColor: '#ccc',
+  },
+  input: {
     borderWidth: 1,
-    marginBottom: 20,
-    paddingHorizontal: 10,
-},
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
 });
 
 export default LoginScreen;

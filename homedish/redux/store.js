@@ -1,19 +1,18 @@
 import { configureStore } from '@reduxjs/toolkit';
 import cartSlice from './slices/cartSlice';
+import userSlice from './slices/userSlice';
+import orderSlice from './slices/orderSlice';
 
-// Add other reducers here if needed (e.g., userSlice, foodSlice)
 export const store = configureStore({
   reducer: {
     cart: cartSlice,
-    // Add more slices like this:
-    // user: userSlice,
-    // food: foodSlice,
+    user: userSlice,
+    orders: orderSlice,
   },
-  // Middleware configuration for additional functionality like logging or error tracking
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware({
-    serializableCheck: false,
-  }),
-  // Enable Redux DevTools Extension in development mode
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: false,
+    }),
   devTools: process.env.NODE_ENV !== 'production',
 });
 
