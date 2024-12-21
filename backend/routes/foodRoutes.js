@@ -5,6 +5,14 @@ const path = require('path');
 module.exports = (db) => {
   const router = express.Router();
 
+  // Middleware to log all incoming requests
+  router.use((req, res, next) => {
+    console.log(`Incoming Request: ${req.method} ${req.originalUrl}`);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    next();
+  });
+
   // Configure multer for file uploads
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -26,8 +34,9 @@ module.exports = (db) => {
       return res.status(400).send('All fields are required');
     }
 
-    const sql = "INSERT INTO food_listings (title, description, price, user_id, image) VALUES (?, ?, ?, ?, ?)";
-    db.query(sql, [title, description, price, user_id, image], (error, results) => {
+    const sql =
+      "INSERT INTO food_listings (title, description, price, user_id, image, is_sold) VALUES (?, ?, ?, ?, ?, 0)";
+    db.query(sql, [title, description, price, user_id, image], (error) => {
       if (error) {
         console.error('Error adding food listing:', error);
         res.status(500).send('Failed to add food listing');
@@ -64,37 +73,121 @@ module.exports = (db) => {
     });
   });
 
-  // Purchase a food item
-  router.post('/buy', (req, res) => {
-    const { food_id, buyer_id } = req.body;
+  // Mark a food listing as sold
+  router.put('/mark-sold/:food_id', (req, res) => {
+    const { food_id } = req.params;
 
-    if (!food_id || !buyer_id) {
-      return res.status(400).send('Food ID and Buyer ID are required');
+    const sql = "UPDATE food_listings SET is_sold = 1 WHERE id = ?";
+    db.query(sql, [food_id], (error) => {
+      if (error) {
+        console.error('Error marking food as sold:', error);
+        res.status(500).send('Failed to mark food as sold');
+      } else {
+        res.status(200).send('Food marked as sold successfully');
+      }
+    });
+  });
+
+  // Simulate delivery status
+  router.get('/delivery-status/:order_id', (req, res) => {
+    const { order_id } = req.params;
+
+    const statuses = [
+      { status: 'Order Received', coordinates: { lat: 37.7749, lng: -122.4194 } },
+      { status: 'Driver Assigned', coordinates: { lat: 37.7750, lng: -122.4180 } },
+      { status: 'En Route', coordinates: { lat: 37.7751, lng: -122.4170 } },
+      { status: 'Delivered', coordinates: { lat: 37.7752, lng: -122.4160 } },
+    ];
+
+    const index = parseInt(order_id) % statuses.length;
+    const currentStatus = statuses[index];
+
+    res.status(200).json({
+      order_id,
+      status: currentStatus.status,
+      driver_location: currentStatus.coordinates,
+    });
+  });
+
+  // Fetch orders for a specific user
+  router.get('/orders/:user_id', (req, res) => {
+    const userId = req.params.user_id;
+
+    const sql = `
+      SELECT orders.id AS order_id, orders.delivery_address, orders.payment_method,
+             food_listings.title, food_listings.price, food_listings.image, food_listings.is_sold
+      FROM orders
+      JOIN food_listings ON orders.food_id = food_listings.id
+      WHERE orders.buyer_id = ?
+    `;
+
+    db.query(sql, [userId], (error, results) => {
+      if (error) {
+        console.error('Error fetching orders:', error);
+        res.status(500).send('Failed to fetch orders');
+      } else {
+        res.status(200).json(results);
+      }
+    });
+  });
+
+  // Place a single order
+  router.post('/buy', (req, res) => {
+    console.log('Incoming Place Order Request:', req.body);
+
+    const { food_id, buyer_id, delivery_address, payment_method } = req.body;
+
+    if (!food_id || !buyer_id || !delivery_address || !payment_method) {
+      console.error('Validation Error: Missing required fields');
+      return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Verify that the food exists
-    const verifyFoodSQL = "SELECT * FROM food_listings WHERE id = ?";
-    db.query(verifyFoodSQL, [food_id], (error, results) => {
+    const sql = `
+      INSERT INTO orders (food_id, buyer_id, delivery_address, payment_method) 
+      VALUES (?, ?, ?, ?)
+    `;
+
+    db.query(sql, [food_id, buyer_id, delivery_address, payment_method], (error, results) => {
       if (error) {
-        console.error('Error verifying food existence:', error);
-        return res.status(500).send('Server error while verifying food');
+        console.error('Error placing order:', error);
+        res.status(500).json({ message: 'Failed to place order' });
+      } else {
+        res.status(201).json({ message: 'Order placed successfully', order_id: results.insertId });
       }
+    });
+  });
 
-      if (results.length === 0) {
-        return res.status(404).send('Food not found');
-      }
+  // Place bulk orders (checkout)
+  router.post('/checkout', (req, res) => {
+    console.log('Incoming Checkout Request:', req.body);
 
-      // Proceed with the purchase
-      const sql = "UPDATE food_listings SET buyer_id = ? WHERE id = ?";
-      db.query(sql, [buyer_id, food_id], (updateError, updateResults) => {
-        if (updateError) {
-          console.error('Error purchasing food:', updateError);
-          res.status(500).send('Failed to purchase food');
-        } else {
-          res.status(200).send('Food purchased successfully');
+    const { user_id, items } = req.body;
+
+    if (!user_id || !items || items.length === 0) {
+      console.error('Validation Error: Missing required fields');
+      return res.status(400).json({ message: 'User ID and at least one item are required' });
+    }
+
+    const sql = `
+      INSERT INTO orders (food_id, buyer_id, delivery_address, payment_method)
+      VALUES (?, ?, ?, ?)
+    `;
+
+    let failed = false;
+    items.forEach((item) => {
+      db.query(sql, [item.food_id, user_id, item.delivery_address, item.payment_method], (error) => {
+        if (error) {
+          console.error('Error placing order:', error);
+          failed = true;
         }
       });
     });
+
+    if (failed) {
+      res.status(500).json({ message: 'Some orders could not be placed' });
+    } else {
+      res.status(201).json({ message: 'Orders placed successfully' });
+    }
   });
 
   return router;
